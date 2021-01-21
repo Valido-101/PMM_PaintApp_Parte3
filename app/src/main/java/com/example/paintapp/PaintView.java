@@ -1,7 +1,10 @@
 package com.example.paintapp;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -9,12 +12,26 @@ import android.graphics.EmbossMaskFilter;
 import android.graphics.MaskFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.Locale;
 
 
 public class PaintView extends View {
@@ -37,6 +54,7 @@ public class PaintView extends View {
     private Bitmap mBitmap;
     private Canvas mCanvas;
     private Paint mBitmapPaint = new Paint(Paint.DITHER_FLAG);
+
 
     public PaintView(Context context) {
         this(context, null);
@@ -89,6 +107,69 @@ public class PaintView extends View {
         paths.clear();
         normal();
         invalidate();
+    }
+
+    public Bitmap getBitmap()
+    {
+        //this.measure(100, 100);
+        //this.layout(0, 0, 100, 100);
+        this.setDrawingCacheEnabled(true);
+        this.buildDrawingCache();
+        Bitmap bmp = Bitmap.createBitmap(this.getDrawingCache());
+        this.setDrawingCacheEnabled(false);
+
+
+        return bmp;
+    }
+
+    public void save(ContentResolver contentResolver, Context context) {
+        try {
+
+            Bitmap imagen = this.getBitmap();
+
+            GregorianCalendar fecha = new GregorianCalendar();
+
+            Date fecha_hoy = fecha.getTime();
+
+            // externalStorage
+            String ExternalStorageDirectory = Environment.getExternalStorageDirectory() + File.separator;
+
+            //carpeta "imagenesguardadas"
+            String rutacarpeta = "Downloads/";
+            // nombre del nuevo png
+            String nombre = "paint_"+fecha_hoy.toString()+".png";
+
+            // Compruebas si existe la carpeta "imagenesguardadas", sino, la crea
+            File directorioImagenes = new File(ExternalStorageDirectory + rutacarpeta);
+            if (!directorioImagenes.exists())
+                directorioImagenes.mkdirs();
+
+            // pones las medidas que quieras del nuevo .png
+            int bitmapWidth = imagen.getWidth(); // para utilizar width de la imagen original: bitmap.getWidth();
+            int bitmapHeight = imagen.getHeight(); // para utilizar height de la imagen original: bitmap.getHeight();
+            Bitmap bitmapout = Bitmap.createScaledBitmap(imagen, bitmapWidth, bitmapHeight, false);
+            //creas el nuevo png en la nueva ruta
+            bitmapout.compress(Bitmap.CompressFormat.PNG, 100, new FileOutputStream(ExternalStorageDirectory + rutacarpeta + nombre));
+
+            // le pones parametros necesarios a la imagen para que se muestre en cualquier galería
+
+            File filefinal = new File(ExternalStorageDirectory + rutacarpeta + nombre);
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.TITLE, "paint_"+fecha_hoy.toString());
+            values.put(MediaStore.Images.Media.DESCRIPTION, "Doraemon sentao'");
+            values.put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis ());
+            values.put(MediaStore.Images.ImageColumns.BUCKET_ID, filefinal.toString().toLowerCase(Locale.getDefault()).hashCode());
+            values.put(MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME, filefinal.getName().toLowerCase(Locale.getDefault()));
+            values.put("_data", filefinal.getAbsolutePath());
+            ContentResolver cr = contentResolver;
+            cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+
+            Toast.makeText(context, "Imagen guardada en la carpeta Descargas",Toast.LENGTH_LONG).show();
+            //
+        } catch (Exception e) {
+            Log.e("ERROR", e.getMessage());
+        }
     }
 
     @Override
